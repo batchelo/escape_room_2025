@@ -7,5 +7,7 @@ the "singe_string_led_test" works just fine for each of the strings.  I simple c
 So, I don't think that it is a problem with the wiring.
 But the "pixel_test" code does not work.  
 I was starting to think that I need to fully power off the ESP32, between each upload.  Perhasp there is resitual code in some memory space
-that is not wiped by the upload process and the "pressing the boot button" when uploading code.
+that is not wiped by the upload process and the "pressing the boot button" when uploading code
+
+If none of this works soon, my backup plan is to go to a single strand of lights and use the "console_2025_single_strand" code 
 
