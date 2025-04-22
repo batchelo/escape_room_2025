@@ -1,13 +1,19 @@
 # escape_room_2025
-This is the code to run the console
-The current (latest version) is the ER_2025_console_less_lights.  There are fewer lights because I switched to a different string of lights.
-I have added a bunch of delays, thinking that the problem was a timing issue.  But that did not seem to help.
-Comments welcome.  Do you see any obvious problems?
-the "singe_string_led_test" works just fine for each of the strings.  I simple change the pin number, run it and it works fine.
-So, I don't think that it is a problem with the wiring.
-But the "pixel_test" code does not work.  
-I was starting to think that I need to fully power off the ESP32, between each upload.  Perhasp there is resitual code in some memory space
-that is not wiped by the upload process and the "pressing the boot button" when uploading code
+This is the code to run the console for Elon's 2025 Escape Room.
+The final version of this code is in the file "ER_2025_console_final".  
 
-If none of this works soon, my backup plan is to go to a single strand of lights and use the "console_2025_single_strand" code 
+It initiates by:
+1) setting four flags to 0
+2) powering the electromagnet (which locks the tubes inside)
+3) lights four leds, which indicate that the four samples are in "inert stasis"
 
+When players use the keypad to put in a code, and then press "#", the script will evalauate whether that is a correct code.
+If so, then it will:
+(1) set a flag to 1
+(2) switch to a light that says "sample activated" and 
+(3) lights will illuminate under that specific tube.
+
+When all four codes are correctly entered, 
+(1) the electromagnet will be disabled, 
+(2) congratulations offered, and 
+(3) players will be instructed to take the tubes and leave the ship.
