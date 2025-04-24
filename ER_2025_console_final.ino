@@ -67,6 +67,7 @@ void setup() {
   pinMode(25,INPUT);//keypad col3
   pinMode(33,INPUT);//keypad row4
   pinMode(32,INPUT);//keypad col1
+  pinMode(13,INPUT); //keypad row1
 }
 
 void loop() 
