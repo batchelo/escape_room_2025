@@ -1,0 +1,262 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
+
+// TFT Display Pins (SPI)
+#define TFT_CS   5
+#define TFT_DC   2
+#define TFT_RST  4
+#define TFT_MOSI 23
+#define TFT_CLK  18
+
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
+
+// Joystick Pins
+#define JOY1_X 36
+#define JOY1_Y 39
+#define JOY2_X 34
+
+// Screen and game constants
+const int screenWidth = 320;
+const int screenHeight = 240;
+const int centerX = screenWidth / 2;
+const int groundY = 210;
+const int obstacleSize = 10;
+const int rocketHeight = 50;
+const int rocketWidth = 14;
+
+// Rocket state
+float angle = 0;
+float angularVelocity = 0;
+float fallSpeed = 2.8;
+float rocketX = centerX;
+float rocketY = 0;
+bool landed = false;
+bool crashed = false;
+int level = 1;
+
+// Obstacle data
+const int maxObstacles = 6;
+int obstacleX[maxObstacles];
+int obstacleY[maxObstacles];
+bool isMoving[maxObstacles];  // only used in level 2
+int moveDir[maxObstacles];
+
+float readJoystick(int pin) {
+  int val = analogRead(pin);
+  return (val - 2048) / 2048.0;
+}
+
+void drawStars() {
+  for (int i = 0; i < 40; i++) {
+    int x = random(0, screenWidth);
+    int y = random(0, groundY);
+    tft.drawPixel(x, y, ILI9341_WHITE);
+  }
+}
+
+void drawObstacles() {
+  for (int i = 0; i < maxObstacles; i++) {
+    tft.fillRect(obstacleX[i] - obstacleSize / 2, obstacleY[i] - obstacleSize / 2,
+                 obstacleSize, obstacleSize, ILI9341_ORANGE);
+  }
+}
+
+void updateMovingObstacles() {
+  if (level == 2) {
+    for (int i = 0; i < maxObstacles; i++) {
+      if (isMoving[i]) {
+        obstacleX[i] += moveDir[i] * 2;
+        if (obstacleX[i] <= 20 || obstacleX[i] >= screenWidth - 20)
+          moveDir[i] *= -1;
+      }
+    }
+  }
+}
+
+void drawRocket(float cx, float cy, float angleDeg) {
+  tft.setRotation(1);
+  tft.fillScreen(ILI9341_PURPLE);
+  drawStars();
+  drawObstacles();
+
+  float a = radians(angleDeg);
+  int bodyHeight = 30;
+
+  // Red triangle tip
+  int tipX = cx + 0 * cos(a) - (-bodyHeight / 2) * sin(a);
+  int tipY = cy + 0 * sin(a) + (-bodyHeight / 2) * cos(a);
+
+  int baseLeftX = cx + (-rocketWidth / 2) * cos(a) - (-bodyHeight / 2 + 12) * sin(a);
+  int baseLeftY = cy + (-rocketWidth / 2) * sin(a) + (-bodyHeight / 2 + 12) * cos(a);
+
+  int baseRightX = cx + (rocketWidth / 2) * cos(a) - (-bodyHeight / 2 + 12) * sin(a);
+  int baseRightY = cy + (rocketWidth / 2) * sin(a) + (-bodyHeight / 2 + 12) * cos(a);
+
+  tft.fillTriangle(tipX, tipY, baseLeftX, baseLeftY, baseRightX, baseRightY, ILI9341_RED);
+
+  // White rectangular body
+  for (int i = -rocketWidth / 2; i <= rocketWidth / 2; i++) {
+    for (int j = 0; j < bodyHeight; j++) {
+      int x = cx + i * cos(a) - j * sin(a);
+      int y = cy + i * sin(a) + j * cos(a);
+      tft.drawPixel(x, y, ILI9341_WHITE);
+    }
+  }
+
+  // Blue window
+  int wx = cx + 0 * cos(a) - (bodyHeight / 3) * sin(a);
+  int wy = cy + 0 * sin(a) + (bodyHeight / 3) * cos(a);
+  tft.fillCircle(wx, wy, 5, ILI9341_BLUE);
+
+ 
+  // Side booster fins (left and right)
+  // Left fin
+  int finLeftTopX = cx + (-rocketWidth / 2) * cos(a) - (bodyHeight / 3) * sin(a);
+  int finLeftTopY = cy + (-rocketWidth / 2) * sin(a) + (bodyHeight / 3) * cos(a);
+  int finLeftMidX = cx + (-rocketWidth - 6) * cos(a) - (bodyHeight / 3 + 10) * sin(a);
+  int finLeftMidY = cy + (-rocketWidth - 6) * sin(a) + (bodyHeight / 3 + 10) * cos(a);
+  int finLeftBotX = cx + (-rocketWidth / 2) * cos(a) - (bodyHeight + 6) * sin(a);
+  int finLeftBotY = cy + (-rocketWidth / 2) * sin(a) + (bodyHeight + 6) * cos(a);
+  tft.fillTriangle(finLeftTopX, finLeftTopY, finLeftMidX, finLeftMidY, finLeftBotX, finLeftBotY, ILI9341_WHITE);
+
+  // Right fin
+  int finRightTopX = cx + (rocketWidth / 2) * cos(a) - (bodyHeight / 3) * sin(a);
+  int finRightTopY = cy + (rocketWidth / 2) * sin(a) + (bodyHeight / 3) * cos(a);
+  int finRightMidX = cx + (rocketWidth + 6) * cos(a) - (bodyHeight / 3 + 10) * sin(a);
+  int finRightMidY = cy + (rocketWidth + 6) * sin(a) + (bodyHeight / 3 + 10) * cos(a);
+  int finRightBotX = cx + (rocketWidth / 2) * cos(a) - (bodyHeight + 6) * sin(a);
+  int finRightBotY = cy + (rocketWidth / 2) * sin(a) + (bodyHeight + 6) * cos(a);
+  tft.fillTriangle(finRightTopX, finRightTopY, finRightMidX, finRightMidY, finRightBotX, finRightBotY, ILI9341_WHITE);
+
+
+  // Flame
+  int fx = cx + 0 * cos(a) - (bodyHeight + 6) * sin(a);
+  int fy = cy + 0 * sin(a) + (bodyHeight + 6) * cos(a);
+  tft.fillTriangle(fx, fy, fx - 4, fy - 10, fx + 4, fy - 10, ILI9341_RED);
+  tft.fillTriangle(fx, fy - 2, fx - 3, fy - 10, fx + 3, fy - 10, ILI9341_ORANGE);
+  tft.drawPixel(fx, fy - 6, ILI9341_YELLOW);
+
+  // Ground
+  tft.drawLine(0, groundY, screenWidth, groundY, ILI9341_GREEN);
+}
+
+void showMessage(const char* msg, uint16_t color) {
+  tft.setCursor(50, screenHeight / 2 - 10);
+  tft.setTextColor(color);
+  tft.setTextSize(3);
+  tft.print(msg);
+}
+
+void setupLevel() {
+  if (level == 1) {
+    // Pyramid: 1 on top, 2 mid, 3 bottom
+    obstacleX[0] = centerX;
+    obstacleY[0] = 60;
+
+    obstacleX[1] = centerX - 30;
+    obstacleY[1] = 100;
+    obstacleX[2] = centerX + 30;
+    obstacleY[2] = 100;
+
+    obstacleX[3] = centerX - 60;
+    obstacleY[3] = 140;
+    obstacleX[4] = centerX;
+    obstacleY[4] = 140;
+    obstacleX[5] = centerX + 60;
+    obstacleY[5] = 140;
+
+    for (int i = 0; i < maxObstacles; i++) {
+      isMoving[i] = false;
+    }
+  } else {
+    for (int i = 0; i < maxObstacles; i++) {
+      obstacleX[i] = random(40, screenWidth - 40);
+      obstacleY[i] = random(60, groundY - 40);
+      isMoving[i] = true;
+      moveDir[i] = random(0, 2) == 0 ? -1 : 1;
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);
+  tft.begin();
+  tft.setRotation(1);
+  tft.fillScreen(ILI9341_PURPLE);
+  setupLevel();
+}
+
+void loop() {
+ if (landed || crashed) {
+    if (crashed) {
+      showMessage("You Crashed!", ILI9341_RED);
+      delay(3000);
+      level = 1;  // restart level 1 if crash
+    } else {
+      if (level == 1) {
+        showMessage("Done with Level 1", ILI9341_YELLOW);
+        delay(5000);
+        level = 2;
+      } else {
+        showMessage("SUCCESS!", ILI9341_YELLOW);
+        delay(3000);
+        level = 1;
+      }
+    }
+
+    // Reset state
+    rocketX = centerX;
+    rocketY = 0;
+    angle = 0;
+    angularVelocity = 0;
+    landed = false;
+    crashed = false;
+
+    setupLevel();
+    return;
+ }
+
+  float joyLeftX = readJoystick(JOY1_X);
+  float joyRightY = readJoystick(JOY2_X);
+
+  rocketX += joyLeftX * 4;
+  rocketY += joyRightY * 4;
+  rocketY += fallSpeed;
+
+  rocketX = constrain(rocketX, rocketWidth / 2, screenWidth - rocketWidth / 2);
+  rocketY = constrain(rocketY, 0, groundY - rocketHeight / 2);
+
+  angularVelocity = (joyLeftX + readJoystick(JOY2_X)) * 3.5;
+  angle += angularVelocity;
+
+  updateMovingObstacles();
+
+  for (int i = 0; i < maxObstacles; i++) {
+    if (abs(rocketX - obstacleX[i]) < (rocketWidth / 2 + obstacleSize / 2) &&
+        abs(rocketY - obstacleY[i]) < (rocketHeight / 2 + obstacleSize / 2)) {
+      crashed = true;
+    }
+  }
+
+
+
+  if (!landed && !crashed && rocketY + rocketHeight / 2 >= groundY) {
+    float normalizedAngle = fmod(angle, 360);
+    if (normalizedAngle > 180) normalizedAngle -= 360;
+    if (normalizedAngle < -180) normalizedAngle += 360;
+  
+    Serial.print("Normalized angle at landing: ");
+    Serial.println(normalizedAngle);
+  
+    // Example: upright rocket = angle near 0
+    if (normalizedAngle >= -10 && normalizedAngle <= 10) {
+      landed = true;
+    } else {
+      crashed = true;
+    }
+  }    
+
+  drawRocket(rocketX, rocketY, angle);
+  delay(50);
+}
